@@ -1,19 +1,86 @@
 const express = require('express');
-const app = express();
 const mongoose = require('mongoose');
+const { join } = require('node:path');
+
 const userModel = require('./models/user');
 const db = require('./config/conn');
+const chatModel = require('./models/chat');
 
 
-const port = 3000;
+const { Server } = require("socket.io");
+const { createServer } = require('http');
+const app = express();
+const server = createServer(app);
+const io = new Server(server);
+
+
 
 
 app.use(express.json()); // Middleware to parse JSON bodies
 
-app.get('/', (req, res) => {
-    res.send('Hello World');
+// app.get('/', (req, res) => {
+//     res.sendFile(join(__dirname, 'index.html'));
+// });
+// route for chat  
+
+io.on('connection', (socket) => {
+    console.log('a user connected');
 });
 
+
+io.on('connection', (socket) => {
+    socket.on('chat message', (msg) => {
+        console.log('message: ' + msg);
+        io.emit('chat message', msg);
+
+
+    });
+});
+
+app.get('/chat', async (req, res) => {
+
+        // Send the HTML file
+        res.sendFile(join(__dirname, 'chat.html'), (err) => {
+            if (err) {
+                console.error('Error sending file:', err);
+                res.status(err.status).end();
+            } else {
+                console.log('Chat HTML file sent successfully');
+            }
+        });
+
+  
+});
+
+
+// APIS 
+app.post('/chat/api', async (req, res)=>{
+    try{
+        const userMsg = new chatModel(req.body)
+        await userMsg.save()
+        res.status(201).json(userMsg)
+    }catch(error){
+        console.log('Error saving user message:', error);
+        res.status(400).json({ message: error.message || 'An error occurred while saving the user message' });
+    }
+})
+
+app.get('/chat/api', async (req, res)=>{
+    try{
+        const userMsg = await chatModel.find()
+        res.status(200).json(userMsg)
+    }catch(error){
+        console.log('Error fetching user message:', error);
+        res.status(400).json({ message: error.message || 'An error occurred while fetching the user message' });
+    }
+})
+
+
+
+
+
+
+// ----------------------------------------------------------------------------
 // POST USERS API
 app.post('/users', async (req, res) => {
     try {
@@ -79,6 +146,6 @@ app.delete('/users/:id', async (req, res) => {
     }
 });         
 
-app.listen(port, () => {    
-    console.log(`Server is running on port ${port}`);
+server.listen(3000, () => {    
+    console.log(`Server is running`);
 });
