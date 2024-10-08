@@ -1,26 +1,39 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const { join } = require('node:path');
+const app = express();
+const path = require('path')
+var session = require('express-session')
+app.use(express.static(path.join(__dirname, 'public'))); 
+app.use(express.json()); // Middleware to parse JSON bodies
+
+app.use(session({
+    secret: 'secret-key',
+    resave: false,
+    saveUninitialized: false,
+}));
 
 const userModel = require('./models/user');
 const db = require('./config/conn');
 const chatModel = require('./models/chat');
 
 
+
 const { Server } = require("socket.io");
 const { createServer } = require('http');
-const app = express();
 const server = createServer(app);
 const io = new Server(server);
 
 
 
 
-app.use(express.json()); // Middleware to parse JSON bodies
 
-// app.get('/', (req, res) => {
-//     res.sendFile(join(__dirname, 'index.html'));
-// });
+
+app.get('/', (req, res) => {
+
+
+    res.sendFile(join(__dirname, 'index.html'));
+});
 // route for chat  
 
 io.on('connection', (socket) => {
@@ -38,7 +51,6 @@ io.on('connection', (socket) => {
 });
 
 app.get('/chat', async (req, res) => {
-
         // Send the HTML file
         res.sendFile(join(__dirname, 'chat.html'), (err) => {
             if (err) {
@@ -75,6 +87,91 @@ app.get('/chat/api', async (req, res)=>{
     }
 })
 
+// SIGN UP API       // SIGN UP API           // SIGN UP API 
+app.post('/signup/api', async (req, res) => {
+    try {
+        // Fetch all users
+        const allUsers = await userModel.find();
+
+        // Check if the user already exists
+        const userExists = allUsers.some(user => user.name === req.body.name);
+        
+        if (userExists) {
+            return res.status(201).json({ message: "User Already Exists" });
+        }
+        
+        // Create and save the new user
+        const newUser = new userModel(req.body);
+        await newUser.save();
+        return res.status(201).json(newUser);
+    } 
+    catch (error) {
+        console.error('Error saving user:', error);
+        return res.status(400).json({ message: error.message || 'An error occurred while saving the user' });
+    }
+});
+// LOGIN  API      LOGIN  API          LOGIN  API          LOGIN  API 
+// app.post('/login/api', async (req, res)=>{
+//     try{
+//         const {name} = req.body.name;
+//         const userExists =  userModel.exists({name});
+//             if(userExists){
+//                 return res.status(201).json({message: "user Exists"})
+//             }
+//             else{
+//                 return res.status(201).json({message: "user Doesnt exists"})
+//             }
+//     }catch(err){
+//         console.log(err)
+//     }
+// })
+app.post('/login/api', async (req, res) => {
+    try {
+        const { name } = req.body;
+        const userExists = await userModel.exists({ name });
+
+        if (userExists) {
+            req.session.isLoggedIn = true;
+            req.session.username = name;
+            return res.status(200).json({ message: "User exists" });
+        } else {
+            return res.status(404).json({ message: "User doesn't exist" });
+        }
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Internal Server Error" });
+    }
+});
+
+// LOGIN  API ENd      LOGIN  API ENd      LOGIN  API ENd      LOGIN  API ENd
+
+app.get('/signup', (req, res)=>{
+    res.sendFile(join(__dirname, 'signup.html'));
+})
+// SIGN UP API ENDS      // SIGN UP API ENDS     // SIGN UP API ENDS    
+
+
+app.get('/api/checkSession', (req, res)=>{
+        if(req.session.isLoggedIn === true){
+            res.json({isLoggedIn:true, user: req.session })
+
+        }
+        else{
+            res.json({isLoggedIn:false})
+        }
+})
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -82,16 +179,16 @@ app.get('/chat/api', async (req, res)=>{
 
 // ----------------------------------------------------------------------------
 // POST USERS API
-app.post('/users', async (req, res) => {
-    try {
-        const user = new userModel(req.body);
-        await user.save();
-        res.status(201).json(user);
-    } catch (error) {
-        console.error('Error saving user:', error);
-        res.status(400).json({ message: error.message || 'An error occurred while saving the user' });
-    }
-});
+// app.post('/users', async (req, res) => {
+//     try {
+//         const user = new userModel(req.body);
+//         await user.save();
+//         res.status(201).json(user);
+//     } catch (error) {
+//         console.error('Error saving user:', error);
+//         res.status(400).json({ message: error.message || 'An error occurred while saving the user' });
+//     }
+// });
 
 // GET USERS API
 app.get('/users', async (req, res) => {
